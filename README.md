@@ -1,6 +1,6 @@
-# DevCleaner
+# DevStrip
 
-DevCleaner is a command-line utility that helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. It scans common project folders under your home directory as well as any paths you provide, reports the reclaimable space, and optionally deletes the selected directories for you.
+DevStrip is a command-line utility that helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. It scans common project folders under your home directory as well as any paths you provide, reports the reclaimable space, and optionally deletes the selected directories for you.
 
 ## Requirements
 
@@ -12,10 +12,10 @@ DevCleaner is a command-line utility that helps macOS developers reclaim disk sp
 Install the latest published release from crates.io:
 
 ```bash
-cargo install devcleaner
+cargo install devstrip
 ```
 
-You can also build and install DevCleaner directly from the source.
+You can also build and install DevStrip directly from the source.
 
 ```bash
 # Install into your Cargo bin directory (usually ~/.cargo/bin)
@@ -26,7 +26,7 @@ Alternatively, build it locally and run the binary from `target/release`:
 
 ```bash
 cargo build --release
-./target/release/devcleaner --help
+./target/release/devstrip --help
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ cargo build --release
 Run the tool from the directory you want to inspect, or provide additional roots explicitly. By default it scans the current working directory along with common project folders in your home directory (`Projects`, `workspace`, `Work`, `Developer`).
 
 ```bash
-devcleaner
+devstrip
 ```
 
 Key options:
@@ -52,7 +52,7 @@ Key options:
 Example: perform a non-interactive cleanup of personal and work projects, while keeping two recent DerivedData folders and excluding a specific repository.
 
 ```bash
-devcleaner \
+devstrip \
   --roots ~/Projects/personal ~/Work/company \
   --exclude ~/Projects/personal/ios-app \
   --keep-latest-derived 2 \
@@ -62,7 +62,7 @@ devcleaner \
 During a dry run, the tool reports all candidates and the total reclaimable space but does not delete anything:
 
 ```bash
-devcleaner --dry-run
+devstrip --dry-run
 ```
 
 ## How It Works
@@ -84,8 +84,8 @@ It estimates sizes, sorts candidates by size, and prints a summary before asking
 
 ## Uninstall
 
-If you previously installed DevCleaner with `cargo install`, remove it with:
+If you previously installed DevStrip with `cargo install`, remove it with:
 
 ```bash
-cargo uninstall devcleaner
+cargo uninstall devstrip
 ```
