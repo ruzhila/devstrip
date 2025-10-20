@@ -1,6 +1,6 @@
-use byte_unit::Byte;
 use chrono::{DateTime, Local, Utc};
 use clap::Parser;
+use human_bytes::human_bytes;
 use std::collections::{HashSet, VecDeque};
 use std::env;
 use std::fs;
@@ -768,16 +768,9 @@ fn print_cli_report(candidates: &[Candidate], styler: &TerminalStyler) {
     let reason_width = 48usize;
 
     for (idx, candidate) in candidates.iter().enumerate() {
-        let (value, unit) = humanize_value_unit(candidate.size_bytes);
-        let unit_str = unit.as_str();
-        let size_plain = format!("{:>width$.1} {}", value, unit_str, width = size_width - 3);
-        let size_colored = match unit_str {
-            "TB" => styler.accent(&size_plain),
-            "GB" => styler.warning(&size_plain),
-            "MB" => styler.blue(&size_plain),
-            "KB" => styler.success(&size_plain),
-            _ => styler.dim(&size_plain),
-        };
+        let size_text = humanize_bytes(candidate.size_bytes);
+        let size_plain = format!("{:>width$}", size_text, width = size_width);
+        let size_colored = colorize_size(candidate.size_bytes, &size_plain, styler);
         let category_text = format!("{:<width$}", candidate.category, width = category_width);
         let category_colored = styler.accent(&category_text);
         let index_label = styler.dim(&format!("[{:02}]", idx + 1));
@@ -979,17 +972,22 @@ fn confirm_cleanup(styler: &TerminalStyler) -> Result<bool> {
     }
 }
 
-fn humanize_value_unit(size: u64) -> (f64, String) {
-    let byte = Byte::from_bytes(size as u128);
-    let adjusted = byte.get_appropriate_unit(false);
-    let value = adjusted.get_value();
-    let unit = adjusted.get_unit().to_string();
-    (value, unit)
+fn humanize_bytes(size: u64) -> String {
+    human_bytes(size as f64)
 }
 
-fn humanize_bytes(size: u64) -> String {
-    let (value, unit) = humanize_value_unit(size);
-    format!("{:.1} {}", value, unit)
+fn colorize_size(size_bytes: u64, text: &str, styler: &TerminalStyler) -> String {
+    if size_bytes >= 1_u64 << 40 {
+        styler.accent(text)
+    } else if size_bytes >= 1_u64 << 30 {
+        styler.warning(text)
+    } else if size_bytes >= 1_u64 << 20 {
+        styler.blue(text)
+    } else if size_bytes >= 1_u64 << 10 {
+        styler.success(text)
+    } else {
+        styler.dim(text)
+    }
 }
 
 fn format_system_time(ts: SystemTime) -> String {
