@@ -16,6 +16,7 @@ cargo install devstrip
 ```
 
 You can also build and install DevStrip directly from the source.
+<img src="./result.png" width="580px"/> 
 
 ```bash
 # Install into your Cargo bin directory (usually ~/.cargo/bin)
