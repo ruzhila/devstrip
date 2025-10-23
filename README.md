@@ -49,6 +49,7 @@ Key options:
 - `--dry-run`: show what would be removed without deleting anything.
 - `--yes`: skip the interactive confirmation prompt.
 - `--no-color`: disable ANSI styling (also disabled automatically when `NO_COLOR` is set).
+- `--all`: scan all default directories and your custom roots (may take a long time).
 
 Example: perform a non-interactive cleanup of personal and work projects, while keeping two recent DerivedData folders and excluding a specific repository.
 
