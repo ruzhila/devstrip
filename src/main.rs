@@ -2,7 +2,7 @@ use chrono::{DateTime, Local, Utc};
 use clap::Parser;
 use human_bytes::human_bytes;
 use std::collections::{HashSet, VecDeque};
-use std::env;
+use std::{env, u32};
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
@@ -98,6 +98,8 @@ struct Args {
     dry_run: bool,
     #[arg(long = "no-color")]
     no_color: bool,
+    #[arg(short = 'a', long = "all")]
+    all: bool,
 }
 
 #[derive(Clone)]
@@ -251,7 +253,6 @@ fn real_main() -> Result<()> {
     let args = Args::parse();
     let styler = TerminalStyler::new(args.no_color);
     let config = build_scan_config(&args)?;
-
     let candidates = run_with_spinner("Scanning for cleanup candidates", &styler, {
         let config = config;
         move |reporter| Ok(gather_candidates(&config, &reporter))
@@ -314,15 +315,25 @@ fn build_scan_config(args: &Args) -> Result<ScanConfig> {
     let exclude_inputs = expand_paths(&args.excludes);
     let exclude_paths = normalize_paths(&exclude_inputs);
     let resolved_roots = default_roots(&roots, &exclude_paths)?;
-
-    Ok(ScanConfig {
-        roots: resolved_roots,
-        min_age_days: args.min_age_days,
-        max_depth: args.max_depth.max(1),
-        keep_latest_derived: args.keep_latest_derived,
-        keep_latest_cache: args.keep_latest_cache,
-        exclude_paths,
-    })
+    if args.all {
+        Ok(ScanConfig {
+            roots: resolved_roots,
+            min_age_days: 0,
+            max_depth: u32::MAX,
+            keep_latest_derived: 0,
+            keep_latest_cache: 0,
+            exclude_paths,
+        })
+    } else {
+        Ok(ScanConfig {
+            roots: resolved_roots,
+            min_age_days: args.min_age_days,
+            max_depth: args.max_depth.max(1),
+            keep_latest_derived: args.keep_latest_derived,
+            keep_latest_cache: args.keep_latest_cache,
+            exclude_paths,
+        })
+    }
 }
 
 fn expand_path(path: &Path) -> PathBuf {
