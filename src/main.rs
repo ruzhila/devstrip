@@ -877,7 +877,7 @@ fn truncate_status(text: &str) -> String {
     if text.len() <= LIMIT {
         text.to_string()
     } else {
-        let mut truncated = text[..LIMIT - 3].to_string();
+        let mut truncated = text.chars().take(LIMIT - 3).collect::<String>();
         truncated.push_str("...");
         truncated
     }
