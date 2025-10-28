@@ -4,7 +4,7 @@ DevStrip is a command-line utility that helps macOS developers reclaim disk spac
 
 ## Requirements
 
-- Rust toolchain 1.70 or newer (for `std::io::IsTerminal` support)
+- Rust toolchain 1.90 or newer (for `gpui.rs` support)
 - macOS or a Unix-like environment with the same directory layout (the defaults target macOS developer caches)
 
 ## Installation
@@ -29,6 +29,13 @@ Alternatively, build it locally and run the binary from `target/release`:
 cargo build --release
 ./target/release/devstrip --help
 ```
+
+## GUI mode(vi gpui.rs)
+
+```bash
+cargo run --features gui
+```
+<img src="./gui.png" width="580px"/> 
 
 ## Usage
 
