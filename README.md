@@ -1,6 +1,6 @@
 # DevStrip
 
-DevStrip is a command-line utility that helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. It scans common project folders under your home directory as well as any paths you provide, reports the reclaimable space, and optionally deletes the selected directories for you.
+DevStrip is a command-line utility that helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. It scans common project folders under your home directory as well as any paths you provide, reports the reclaimable space, and optionally deletes the selected directories for you. [微信文章-Rust编程入门：devstrip 为开发者定制的磁盘清理工具：node_modules/target 专清工具](https://mp.weixin.qq.com/s/W5rrI_ntH1q5HKnwdTV7LA)
 
 ## Requirements
 
