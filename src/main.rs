@@ -3,7 +3,7 @@ pub fn main() {
     devstrip::gui::run();
 }
 
-#[cfg(not(feature = "gui"))]
+#[cfg(feature = "cli")]
 pub fn main() {
     devstrip::cli::run();
 }

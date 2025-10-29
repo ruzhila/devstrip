@@ -1,6 +1,6 @@
 # DevStrip
 
-DevStrip is a command-line utility that helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. It scans common project folders under your home directory as well as any paths you provide, reports the reclaimable space, and optionally deletes the selected directories for you.
+DevStrip helps macOS developers reclaim disk space by pruning stale build products and language-specific caches. The project now ships with a native GUI powered by `gpui`, while the original command-line interface remains available as an opt-in feature.
 
 ## Requirements
 
@@ -15,13 +15,15 @@ Install the latest published release from crates.io:
 cargo install devstrip
 ```
 
-You can also build and install DevStrip directly from the source.
-<img src="./result.png" width="580px"/> 
+## Quick Start (GUI)
+
+The GUI is enabled by default. Launch it directly with:
 
 ```bash
-# Install into your Cargo bin directory (usually ~/.cargo/bin)
-cargo install --path .
+cargo run
 ```
+
+<img src="./gui.png" width="580px"/> 
 
 Alternatively, build it locally and run the binary from `target/release`:
 
@@ -30,12 +32,22 @@ cargo build --release
 ./target/release/devstrip --help
 ```
 
-## GUI mode(vi gpui.rs)
+
+## CLI Usage
+
+The command-line interface is still available, but you must disable the GUI feature and opt into the `cli` feature when running or building:
 
 ```bash
-cargo run --features gui
+# Run the CLI directly
+cargo run --no-default-features --features cli -- --help
+
+# Install only the CLI binary
+cargo install --no-default-features --features cli devstrip
 ```
-<img src="./gui.png" width="580px"/> 
+
+All CLI flags remain the same as before. The examples below assume you are running in CLI mode.
+
+<img src="./result.png" width="580px"/> 
 
 ## Usage
 

@@ -3,6 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub type CoreResult<T> = std::result::Result<T, String>;
@@ -117,11 +118,26 @@ pub fn scan(config: &ScanConfig) -> Vec<Candidate> {
     scan_with_callback(config, |_| {})
 }
 
+pub fn scan_with_cancel(config: &ScanConfig, cancel: &AtomicBool) -> Vec<Candidate> {
+    scan_with_callback_cancel(config, cancel, |_| {})
+}
+
 pub fn scan_with_callback<F>(config: &ScanConfig, mut callback: F) -> Vec<Candidate>
 where
     F: FnMut(&str),
 {
-    gather_candidates(config, &mut callback)
+    gather_candidates(config, &mut callback, None)
+}
+
+pub fn scan_with_callback_cancel<F>(
+    config: &ScanConfig,
+    cancel: &AtomicBool,
+    mut callback: F,
+) -> Vec<Candidate>
+where
+    F: FnMut(&str),
+{
+    gather_candidates(config, &mut callback, Some(cancel))
 }
 
 pub fn cleanup(candidates: &[Candidate], dry_run: bool) -> Vec<CleanupResult> {
@@ -210,11 +226,19 @@ pub fn scan_total_size(candidates: &[Candidate]) -> u64 {
     candidates.iter().map(|c| c.size_bytes).sum()
 }
 
-fn gather_candidates<F>(config: &ScanConfig, reporter: &mut F) -> Vec<Candidate>
+fn gather_candidates<F>(
+    config: &ScanConfig,
+    reporter: &mut F,
+    cancel_flag: Option<&AtomicBool>,
+) -> Vec<Candidate>
 where
     F: FnMut(&str),
 {
     let mut candidates = Vec::new();
+
+    if is_cancelled(cancel_flag) {
+        return candidates;
+    }
 
     let home = home_dir().unwrap_or_else(|| PathBuf::from("."));
 
@@ -226,6 +250,7 @@ where
         "Old DerivedData projects",
         &config.exclude_paths,
         reporter,
+        cancel_flag,
     ));
 
     let archives = home.join("Library/Developer/Xcode/Archives");
@@ -236,6 +261,7 @@ where
         "Old Xcode archives",
         &config.exclude_paths,
         reporter,
+        cancel_flag,
     ));
 
     let core_sim = home.join("Library/Developer/CoreSimulator/Caches");
@@ -245,6 +271,7 @@ where
         "CoreSimulator caches",
         &config.exclude_paths,
         reporter,
+        cancel_flag,
     ));
 
     let brew_cache = home.join("Library/Caches/Homebrew");
@@ -255,6 +282,7 @@ where
         "Homebrew download cache",
         &config.exclude_paths,
         reporter,
+        cancel_flag,
     ));
 
     for (path, category, reason) in build_cache_targets(&home) {
@@ -264,7 +292,11 @@ where
             reason,
             &config.exclude_paths,
             reporter,
+            cancel_flag,
         ));
+        if is_cancelled(cancel_flag) {
+            return candidates;
+        }
     }
 
     candidates.extend(collect_matching_dirs(
@@ -275,6 +307,7 @@ where
         config.max_depth,
         &config.exclude_paths,
         reporter,
+        cancel_flag,
     ));
 
     let mut candidates = dedupe_candidates(candidates);
@@ -296,6 +329,7 @@ fn collect_keep_latest<F>(
     reason: &str,
     excludes: &[PathBuf],
     reporter: &mut F,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Vec<Candidate>
 where
     F: FnMut(&str),
@@ -305,6 +339,9 @@ where
         return results;
     }
     reporter(&format!("Scanning: {}", base.display()));
+    if is_cancelled(cancel_flag) {
+        return results;
+    }
 
     let entries = match fs::read_dir(base) {
         Ok(iter) => iter,
@@ -318,6 +355,9 @@ where
             continue;
         }
         reporter(&format!("Scanning: {}", child.display()));
+        if is_cancelled(cancel_flag) {
+            break;
+        }
         let metadata = match safe_metadata(&child) {
             Some(meta) => meta,
             None => continue,
@@ -336,7 +376,7 @@ where
         if index < keep {
             continue;
         }
-        let size = calculate_size(&path);
+        let size = calculate_size(&path, cancel_flag);
         if size == 0 {
             continue;
         }
@@ -347,6 +387,9 @@ where
             reason: reason.to_string(),
             last_used: Some(mtime),
         });
+        if is_cancelled(cancel_flag) {
+            break;
+        }
     }
 
     results
@@ -358,6 +401,7 @@ fn collect_whole_directory<F>(
     reason: &str,
     excludes: &[PathBuf],
     reporter: &mut F,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Vec<Candidate>
 where
     F: FnMut(&str),
@@ -366,7 +410,10 @@ where
         return Vec::new();
     }
     reporter(&format!("Scanning: {}", path.display()));
-    let size = calculate_size(path);
+    if is_cancelled(cancel_flag) {
+        return Vec::new();
+    }
+    let size = calculate_size(path, cancel_flag);
     if size == 0 {
         return Vec::new();
     }
@@ -389,6 +436,7 @@ fn collect_matching_dirs<F>(
     max_depth: u32,
     excludes: &[PathBuf],
     reporter: &mut F,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Vec<Candidate>
 where
     F: FnMut(&str),
@@ -408,6 +456,9 @@ where
             continue;
         }
         reporter(&format!("Scanning: {}", root.display()));
+        if is_cancelled(cancel_flag) {
+            break;
+        }
 
         let mut queue: VecDeque<(PathBuf, u32)> = VecDeque::new();
         queue.push_back((root.clone(), 0));
@@ -420,6 +471,9 @@ where
                 continue;
             }
             reporter(&format!("Scanning: {}", current.display()));
+            if is_cancelled(cancel_flag) {
+                break;
+            }
 
             let entries = match fs::read_dir(&current) {
                 Ok(iter) => iter,
@@ -459,7 +513,7 @@ where
                 if let Some(reason_text) =
                     classify_project_dir(name, reason, &pattern_set, cutoff, modified)
                 {
-                    let size = calculate_size(&path);
+                    let size = calculate_size(&path, cancel_flag);
                     if size > 0 {
                         results.push(Candidate {
                             path: path.clone(),
@@ -469,6 +523,9 @@ where
                             last_used: modified,
                         });
                     }
+                    if is_cancelled(cancel_flag) {
+                        break;
+                    }
                     continue;
                 }
 
@@ -476,6 +533,12 @@ where
                     queue.push_back((path, depth + 1));
                 }
             }
+            if is_cancelled(cancel_flag) {
+                break;
+            }
+        }
+        if is_cancelled(cancel_flag) {
+            break;
         }
     }
 
@@ -546,7 +609,7 @@ fn safe_metadata(path: &Path) -> Option<fs::Metadata> {
     fs::symlink_metadata(path).ok()
 }
 
-fn calculate_size(path: &Path) -> u64 {
+fn calculate_size(path: &Path, cancel_flag: Option<&AtomicBool>) -> u64 {
     let metadata = match safe_metadata(path) {
         Some(meta) => meta,
         None => return 0,
@@ -554,6 +617,10 @@ fn calculate_size(path: &Path) -> u64 {
 
     if !metadata.is_dir() {
         return metadata.len();
+    }
+
+    if is_cancelled(cancel_flag) {
+        return 0;
     }
 
     let mut total = 0u64;
@@ -572,6 +639,9 @@ fn calculate_size(path: &Path) -> u64 {
             if entry_meta.file_type().is_symlink() {
                 continue;
             }
+            if is_cancelled(cancel_flag) {
+                return total;
+            }
             if entry_meta.is_dir() {
                 stack.push(entry_path);
             } else {
@@ -581,6 +651,10 @@ fn calculate_size(path: &Path) -> u64 {
     }
 
     total
+}
+
+fn is_cancelled(flag: Option<&AtomicBool>) -> bool {
+    flag.map(|f| f.load(Ordering::Relaxed)).unwrap_or(false)
 }
 
 pub fn is_excluded(path: &Path, excludes: &[PathBuf]) -> bool {
